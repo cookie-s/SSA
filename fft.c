@@ -4,19 +4,8 @@
 #include <string.h>
 #include <assert.h>
 
-typedef unsigned __int128 uint128_t;
-
-void print_hex(uint8_t *f, uint32_t n) {
-    for(int i=0; i<n; i+=64) {
-        for(int j=0; j<64; j+=16) {
-            for(int k=0; k<16 && i+j+k<n; k++)
-                printf("%02x", f[i+j+k]);
-            printf(" ");
-        }
-        puts("");
-    }
-    return;
-}
+#include "common.h"
+#include "add.h"
 
 inline uint32_t bitrev32(uint32_t x)
 {
@@ -29,39 +18,6 @@ inline uint32_t bitrev32(uint32_t x)
 
 inline uint32_t bitrev(uint32_t x, int msbi) {
     return bitrev32(x) >> (msbi+1);
-}
-
-inline void add(uint8_t *f, const uint8_t *g, uint32_t n) {
-    uint16_t t = 0;
-    for(uint32_t i=0; i<n; i++) {
-        t = (uint16_t)f[i] + (uint16_t)g[i] + t;
-        f[i] = (uint8_t)t;
-        t >>= 8;
-    }
-    if(t) {
-        t = 0;
-        for(uint32_t i=0; i<n; i++) {
-            t = (uint16_t)f[i] + 0xFF + t;
-            f[i] = (uint8_t)t;
-            t >>= 8;
-        }
-    }
-}
-inline void sub(uint8_t *f, const uint8_t *g, uint32_t n) {
-    uint16_t t = 2;
-    for(uint32_t i=0; i<n; i++) {
-        t = (uint16_t)f[i] + (uint16_t)((~g[i] & 0xFF)) + t;
-        f[i] = (uint8_t)t;
-        t >>= 8;
-    }
-    if(t) {
-        t = 0;
-        for(uint32_t i=0; i<n; i++) {
-            t = (uint16_t)f[i] + 0xFF + t;
-            f[i] = (uint8_t)t;
-            t >>= 8;
-        }
-    }
 }
 
 void shift(uint8_t *f, int m, uint32_t n) {
@@ -96,7 +52,7 @@ void shift(uint8_t *f, int m, uint32_t n) {
     if(!m) return;
 
     {
-        uint8_t *flag = (uint8_t*)malloc(n);
+        uint8_t *flag = (uint8_t*)alloca(n);
         memset(flag, 0, n);
         for(uint32_t i=0; i<m; i++) {
             uint8_t s = f[i];
@@ -108,7 +64,6 @@ void shift(uint8_t *f, int m, uint32_t n) {
                 s = t;
             }
         }
-        free(flag); flag = 0;
 
         char zero = 1;
         for(uint32_t i=0; zero && i<m; i++)
@@ -278,9 +233,48 @@ inline void classical64(uint8_t *hh, const uint8_t *ff, const uint8_t *gg, uint3
     }
 }
 
+void karatsuba(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
+    assert(n % 2 == 0);
+    memset(h, 0, 2*n);
+    if(n <= 64) {
+        classical64(h, f, g, n);
+        return;
+    }
+    const uint32_t m = n/2;
+    uint8_t *z0 = malloc(n);
+    uint8_t *z1 = malloc(2*n);
+    uint8_t *z2 = malloc(n);
+    uint8_t *b1 = malloc(m);
+    uint8_t *b2 = malloc(m);
+    uint8_t flag = 0;
+    karatsuba(z0, f, g, m);
+    karatsuba(z2, f+m, g+m, m);
+
+    memcpy(b1, f+m, m);
+    flag |= addc(b1, f, m) << 0;
+    memcpy(b2, g+m, m);
+    flag |= addc(b2, g, m) << 1;
+    karatsuba(z1, b1, b2, m);
+    if(flag & 1) h[3*m] += addc(z1+m, b2, m);
+    if(flag & 2) h[3*m] += addc(z1+m, b1, m);
+    if((flag & 0b11) == 0b11) h[3*m]++;
+    if(!subc(z1, z0, n)) assert(h[3*m]), h[3*m]--;
+    if(!subc(z1, z2, n)) assert(h[3*m]), h[3*m]--;
+
+    assert(!addc(h, z0, n));
+    assert(!addc(h + m, z1, n));
+    assert(!addc(h + 2*m, z2, n));
+
+    free(z0); z0 = 0;
+    free(z1); z1 = 0;
+    free(z2); z2 = 0;
+    free(b1); b1 = 0;
+    free(b2); b2 = 0;
+}
+
 void mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     // len(h) == 2 * len(f) == 2 * len(g) == 2 * n
-    if (n <= 4096) {
+    if (n <= 8192) {
         classical64(h, f, g, n);
         return;
     }
@@ -289,7 +283,6 @@ void mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     const uint32_t sp = 1<<k;
     uint32_t u;
 
-    //for(u = 2; !(sp-(k-1)/2 < n/sp); u++);
     u = 2*n/sp;
     u*= 2;
 
@@ -301,10 +294,8 @@ void mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
 
     const uint32_t each = n/sp;
     for(int i=0; i<sp; i++) {
-        for(int j=0; j<each; j++) {
-            ff[i*u+j] = f[i*each+j];
-            gg[i*u+j] = g[i*each+j];
-        }
+        memcpy(ff + i*u, f + i*each, each);
+        memcpy(gg + i*u, g + i*each, each);
     }
     fft(ff, u, 2*sp);
     fft(gg, u, 2*sp);

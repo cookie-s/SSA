@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "common.h"
 #include "fft.c"
 
 const uint8_t a[] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -110,7 +111,7 @@ void test_fft() {
         uint8_t buf2[4*U] = {};
         for(int i=0; i<U; i++)
             buf2[i*4] = buf1[i];
-         fft(buf2, 4, U);
+        fft(buf2, 4, U);
         ifft(buf2, 4, U);
         for(int i=0; i<U; i++)
             buf2[i] = buf2[4*i];
@@ -124,8 +125,8 @@ void test_fft() {
         uint8_t buf3[32] = {};
         for(int i=0; i<U; i++)
             buf2[i*2] = buf3[i*2] = buf1[i];
-         naive(buf2, 2, 16);
-         fft(buf3, 2, 16);
+        naive(buf2, 2, 16);
+        fft(buf3, 2, 16);
         assert(!memcmp(buf2, buf3, 2*U));
     }
     {
@@ -135,7 +136,7 @@ void test_fft() {
         uint8_t buf2[32] = {};
         for(int i=0; i<U; i++)
             buf2[i*2] = buf1[i];
-         naive(buf2, 2, 16);
+        naive(buf2, 2, 16);
         inaive(buf2, 2, 16);
         for(int i=0; i<U; i++)
             buf2[i] = buf2[2*i];
@@ -143,6 +144,70 @@ void test_fft() {
     }
 }
 
+void test_karatsuba() {
+    uint8_t buf1[U] = {};
+    uint8_t buf2[U*2] = {};
+    uint8_t buf3[U*2] = {};
+    {
+        memcpy(buf1, e, U);
+        karatsuba(buf2, buf1, buf1, U);
+        classical(buf3, buf1, buf1, U);
+        assert(!memcmp(buf2, buf3, 2*U));
+    }
+    {
+        uint8_t f[] = {0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55};
+        uint8_t g[] = {0x6e, 0x34, 0x0b, 0x9c, 0xff, 0xb3, 0x7a, 0x98, 0x9c, 0xa5, 0x44, 0xe6, 0xbb, 0x78, 0x0a, 0x2c, 0x78, 0x90, 0x1d, 0x3f, 0xb3, 0x37, 0x38, 0x76, 0x85, 0x11, 0xa3, 0x06, 0x17, 0xaf, 0xa0, 0x1d};
+        uint8_t buf2[sizeof(f)*2] = {};
+        uint8_t buf3[sizeof(f)*2] = {};
+        karatsuba(buf2, f, g, sizeof(f));
+        classical(buf3, f, g, sizeof(f));
+        assert(!memcmp(buf2, buf3, 2*sizeof(f)));
+    }
+#ifdef BENCH
+    {
+        uint8_t f[524288];
+        uint8_t g[524288];
+        for(int i=0; i<sizeof(f); i++) {
+            f[i] = rand() & 0xFF;
+            g[i] = rand() & 0xFF;
+        }
+        uint8_t buf2[sizeof(f)*2] = {};
+        uint8_t buf3[sizeof(f)*2] = {};
+        karatsuba(buf2, f, g, sizeof(f));
+        classical64(buf3, f, g, sizeof(f));
+        if(memcmp(buf2, buf3, 2*sizeof(f))) {
+            print_hex(f, sizeof(f)); puts("f");
+            print_hex(g, sizeof(f)); puts("g");
+            puts("karatsuba result doesn't match");
+            print_hex(buf2, 2*sizeof(f)); puts("karatsuba");
+            print_hex(buf3, 2*sizeof(f)); puts("classical");
+            assert(0);
+        }
+    }
+#endif
+    {
+        for(int k=0; k<1000; k++) {
+            uint8_t f[64];
+            uint8_t g[64];
+            for(int i=0; i<sizeof(f); i++) {
+                f[i] = rand() & 0xFF;
+                g[i] = rand() & 0xFF;
+            }
+            uint8_t buf2[sizeof(f)*2] = {};
+            uint8_t buf3[sizeof(f)*2] = {};
+            karatsuba(buf2, f, g, sizeof(f));
+            classical64(buf3, f, g, sizeof(f));
+            if(memcmp(buf2, buf3, 2*sizeof(f))) {
+                print_hex(f, sizeof(f)); puts("f");
+                print_hex(g, sizeof(f)); puts("g");
+                puts("karatsuba result doesn't match");
+                print_hex(buf2, 2*sizeof(f)); puts("karatsuba");
+                print_hex(buf3, 2*sizeof(f)); puts("classical");
+                assert(0);
+            }
+        }
+    }
+}
 void test_mult() {
     uint8_t buf1[U] = {};
     uint8_t buf2[U*2] = {};
@@ -162,6 +227,7 @@ void test_mult() {
         classical(buf3, f, g, sizeof(f));
         assert(!memcmp(buf2, buf3, 2*sizeof(f)));
     }
+#define BENCH
 #ifdef BENCH
     {
         uint8_t f[524288];
@@ -173,18 +239,20 @@ void test_mult() {
         uint8_t buf2[sizeof(f)*2] = {};
         uint8_t buf3[sizeof(f)*2] = {};
         mult(buf2, f, g, sizeof(f));
-        classical64(buf3, f, g, sizeof(f));
+        karatsuba(buf3, f, g, sizeof(f));
         if(memcmp(buf2, buf3, 2*sizeof(f))) {
             print_hex(f, sizeof(f)); puts("f");
             print_hex(g, sizeof(f)); puts("g");
             puts("mult result doesn't match");
             print_hex(buf2, 2*sizeof(f)); puts("mult");
             print_hex(buf3, 2*sizeof(f)); puts("classical");
+            assert(0);
         }
     }
 #endif
     {
-        for(int k=0; k<10; k++) {
+        for(int k=0; k<100; k++) {
+            printf("%d\n",k);
             uint8_t f[65536];
             uint8_t g[65536];
             for(int i=0; i<sizeof(f); i++) {
@@ -194,13 +262,14 @@ void test_mult() {
             uint8_t buf2[sizeof(f)*2] = {};
             uint8_t buf3[sizeof(f)*2] = {};
             mult(buf2, f, g, sizeof(f));
-            classical64(buf3, f, g, sizeof(f));
+            karatsuba(buf3, f, g, sizeof(f));
             if(memcmp(buf2, buf3, 2*sizeof(f))) {
                 print_hex(f, sizeof(f)); puts("f");
                 print_hex(g, sizeof(f)); puts("g");
                 puts("mult result doesn't match");
                 print_hex(buf2, 2*sizeof(f)); puts("mult");
                 print_hex(buf3, 2*sizeof(f)); puts("classical");
+                assert(0);
             }
         }
     }
@@ -211,6 +280,7 @@ int main(void) {
     test_add();
     test_sub();
     test_shift();
+    test_karatsuba();
     test_fft();
     test_mult();
 }
