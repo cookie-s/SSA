@@ -93,14 +93,6 @@ void test_shift() {
         shift(buf1, -i, U);
         assert(!memcmp(buf1, buf2, U));
     }
-    for(int i=0; i<2*8*U; i++) {
-        uint8_t buf2[] = {0xb0,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-        memcpy(buf1, buf2, U);
-        memcpy(buf2, buf1, U);
-        shift(buf1,  i, U);
-        shift(buf1, -i, U);
-        assert(!memcmp(buf1, buf2, U));
-    }
 }
 
 void test_fft() {
@@ -228,13 +220,10 @@ void test_mult() {
         classical(buf3, f, g, sizeof(f));
         assert(!memcmp(buf2, buf3, 2*sizeof(f)));
     }
-#define BENCH
 #ifdef BENCH
     {
-        //uint8_t f[524288];
-        //uint8_t g[524288];
-        uint8_t f[1<<20];
-        uint8_t g[1<<20];
+        uint8_t f[1<<19];
+        uint8_t g[1<<19];
         for(int i=0; i<sizeof(f); i++) {
             f[i] = rand() & 0xFF;
             g[i] = rand() & 0xFF;
@@ -249,8 +238,8 @@ void test_mult() {
             print_hex(f, sizeof(f)); puts("f");
             print_hex(g, sizeof(f)); puts("g");
             puts("mult result doesn't match");
-            print_hex(buf2, 2*sizeof(f)); puts("mult");
-            print_hex(buf3, 2*sizeof(f)); puts("classical");
+            print_hex(buf2, 2*sizeof(f)); puts("ssa");
+            print_hex(buf3, 2*sizeof(f)); puts("karatsuba");
             assert(0);
         }
     }
@@ -273,8 +262,8 @@ void test_mult() {
                 print_hex(f, sizeof(f)); puts("f");
                 print_hex(g, sizeof(f)); puts("g");
                 puts("mult result doesn't match");
-                print_hex(buf2, 2*sizeof(f)); puts("mult");
-                print_hex(buf3, 2*sizeof(f)); puts("classical");
+                print_hex(buf2, 2*sizeof(f)); puts("ssa");
+                print_hex(buf3, 2*sizeof(f)); puts("karatsuba");
                 assert(0);
             }
         }

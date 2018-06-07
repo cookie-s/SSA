@@ -1,6 +1,6 @@
 
 CC := gcc
-CFLAGS := -O3
+CFLAGS := -O3 -lprofiler
 
 LIBS := common.o add.o
 

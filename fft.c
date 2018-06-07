@@ -20,13 +20,76 @@ static inline uint32_t bitrev(uint32_t x, int msbi) {
     return bitrev32(x) >> (msbi+1);
 }
 
-void shift(uint8_t *f, int m, uint32_t n) {
+void shift64(uint8_t *ff, int m, uint32_t n) {
+    assert(n % 8 == 0);
+    // f * (1<<m) mod (1<<8*n + 1);
+
+    uint64_t *f = (uint64_t*)ff;
+    n /= 8;
+
+    m %= 2*64*n;
+    m += 2*64*n;
+    m %= 2*64*n;
+
+    {
+        uint128_t t = 0;
+        for(uint32_t i=0; i<n; i++) {
+            t = (((uint128_t)f[i]) << (m%64)) | t;
+            f[i]  = (uint64_t)t;
+            t >>= 64;
+        }
+        if(t) {
+            t = (uint64_t)(~t + 1);
+            t = (uint128_t)f[0] + t;
+            f[0] = (uint64_t)t;
+            t >>= 64;
+            for(int i=1; i<n; i++) {
+                t = (uint128_t)f[i] + 0xFFFFFFFFFFFFFFFFULL + t;
+                f[i] = (uint64_t)t;
+                t >>= 64;
+            }
+        }
+    }
+
+    m /= 64;
+    if(!m) return;
+
+    {
+        uint8_t *flag = (uint8_t*)alloca(n);
+        memset(flag, 0, n);
+        for(uint32_t i=0; i<n; i++) {
+            uint64_t s = f[i];
+            for(int j=(i+m)%n; !flag[j]; j+=m,j%=n) {
+                uint64_t t = f[j];
+                f[j] = s;
+                flag[j] = 1;
+                s = t;
+            }
+        }
+
+        uint128_t t = 1;
+        for(uint32_t i=0; i<n; i++) {
+            t = ((i-m+2*n)%(2*n) >= n ? (uint64_t)~f[i] : ((uint128_t)0xFFFFFFFFFFFFFFFFULL+f[i])) + t;
+            f[i] = (uint64_t)t;
+            t >>= 64;
+        }
+
+        if(!t) {
+            t = 1;
+            for(uint32_t i=0; i<n; i++) {
+                t = (uint128_t)f[i] + t;
+                f[i] = (uint64_t)t;
+                t >>= 64;
+            }
+        }
+    }
+}
+void shift8(uint8_t *f, int m, uint32_t n) {
     // f * (1<<m) mod (1<<8*n + 1);
 
     m %= 2*8*n;
     m += 2*8*n;
     m %= 2*8*n;
-    if(m >= 8*n) shift(f, m - (8*n), n), m = 8*n;
 
     {
         uint16_t t = 0;
@@ -54,10 +117,9 @@ void shift(uint8_t *f, int m, uint32_t n) {
     {
         uint8_t *flag = (uint8_t*)alloca(n);
         memset(flag, 0, n);
-        for(uint32_t i=0; i<m; i++) {
+        for(uint32_t i=0; i<n; i++) {
             uint8_t s = f[i];
-            for(int j=i+m; !flag[j%n]; j+=m) {
-                if(j>=n) s = ~s, j%=n;
+            for(int j=(i+m)%n; !flag[j]; j+=m,j%=n) {
                 uint8_t t = f[j];
                 f[j] = s;
                 flag[j] = 1;
@@ -65,18 +127,9 @@ void shift(uint8_t *f, int m, uint32_t n) {
             }
         }
 
-        char zero = 1;
-        for(uint32_t i=0; zero && i<m; i++)
-            if(f[i] != 0xFF) zero = 0;
-        if(zero) {
-            for(uint32_t i=0; i<m; i++)
-                f[i] = ~f[i];
-            return;
-        }
-
         uint16_t t = 1;
         for(uint32_t i=0; i<n; i++) {
-            t = (uint16_t)f[i] + (i >= m ? 0xFF : 0) + t;
+            t = ((i-m+2*n)%(2*n) >= n ? (uint8_t)~f[i] : (0xFF+f[i])) + t;
             f[i] = (uint8_t)t;
             t >>= 8;
         }
@@ -90,6 +143,12 @@ void shift(uint8_t *f, int m, uint32_t n) {
             }
         }
     }
+}
+void shift(uint8_t *f, uint32_t m, uint32_t n) {
+    if(0 && n % 8 == 0 && n / 8 > 32)
+        shift64(f, m, n);
+    else
+        shift8(f, m, n);
 }
 
 extern inline void fft (uint8_t *f, uint32_t u, uint32_t n) {
@@ -219,14 +278,12 @@ extern inline void classical64(uint8_t *hh, const uint8_t *ff, const uint8_t *gg
     const uint64_t *g = (const uint64_t*)gg;
     const uint64_t  n = nn/8;
     uint64_t *h = (uint64_t*)hh;
-    const uint128_t one = 1;
     for(size_t i=0; i<n; i++) {
         for(size_t j=0; j<n; j++) {
             uint128_t t = (uint128_t)f[i] * (uint128_t)g[j];
             for(int k=i+j; k<2*n && t; k++) {
-                if(((uint128_t)h[k] + (t & ((one<<64)-1)))>>64)
-                    t += one<<64;
-                h[k] += (uint128_t)t;
+                t += (((uint128_t)h[k] + (uint64_t)t)>>64)<<64;
+                h[k] += (uint64_t)t;
                 t >>= 64;
             }
         }
@@ -236,7 +293,7 @@ extern inline void classical64(uint8_t *hh, const uint8_t *ff, const uint8_t *gg
 void karatsuba(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     assert(n % 2 == 0);
     memset(h, 0, 2*n);
-    if(n <= 64) {
+    if(n <= 32) {
         classical64(h, f, g, n);
         return;
     }
@@ -275,21 +332,22 @@ void karatsuba(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
 void mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     // len(h) == 2 * len(f) == 2 * len(g) == 2 * n
 
-    const uint32_t k = 5; // param
-    const uint32_t sp = 1<<k;
-    uint32_t u;
+    uint32_t k, sp, u, each;
+    for(k=12; ; k++) {
+        sp = 1<<k;
 
-    if (n <= 1<<k) {
-        classical64(h, f, g, n);
-        return;
+        if (n <= sp) {
+            karatsuba(h, f, g, n);
+            return;
+        }
+
+        each = n/sp;
+        for(u=2; !(u*8 >= 2*sp && 2*8*each+k-1<8*u); u*=2);
+
+        if(u < n) break;
     }
 
-    // all  8*n bits
-    // each 8*n/sp bits
-    const uint32_t each = n/sp;
-    for(u=2; !(u*8 >= 2*sp && 2*8*each+k+1<8*u); u*=2);
 
-    printf("k%d u%d sp%d n%d\n", k, u, sp, n);
     uint8_t *ff = (uint8_t*)malloc(2*u*sp * sizeof(uint8_t));
     uint8_t *gg = (uint8_t*)malloc(2*u*sp * sizeof(uint8_t));
     memset(ff, 0, 2*u*sp * sizeof(uint8_t));
@@ -303,26 +361,35 @@ void mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     fft(gg, u, 2*sp);
 
     uint8_t *hh = (uint8_t*)malloc(2*u * sizeof(uint8_t));
+    uint8_t *hh2 = (uint8_t*)malloc(2*u * sizeof(uint8_t));
     for(uint32_t i=0; i<2*sp; i++) {
         assert(u < n);
         mult(hh, ff + u*i, gg + u*i, u);
+#if 0
+        karatsuba(hh2, ff + u*i, gg + u*i, u);
+        if(memcmp(hh,hh2,2*u)) {
+            printf("k%d sp%d u%d e%d\n", k, sp, u, each);
+            print_hex(ff + u*i, u); puts("f");
+            print_hex(gg + u*i, u); puts("g");
+            print_hex(hh, 2*u); puts("hh");
+            print_hex(hh2, 2*u); puts("hh2");
+            assert(!memcmp(hh, hh2, 2*u));
+        }
+#endif
         sub(hh, hh + u, u);
         memcpy(ff + u*i, hh, u * sizeof(uint8_t));
     }
     free(hh); hh = 0;
 
     ifft(ff, u, 2*sp);
-    print_hex(ff, 2*u*sp);
     memset(gg, 0, 2*u);
-    memset(gg+2*u, 0, 2*u);
+    memset(gg+2*u+u, 0, u);
     for(int i=0; i<2*sp; i++) {
         memcpy(gg + 2*u, ff + i*u, u);
         add(gg, gg + 2*u, 2*u);
-        for(int j=0; j<each; j++) {
-            h[i*each+j] = gg[j];
-            gg[j] = 0;
-        }
-        shift(gg, -(8*each), 2*u);
+        memcpy(h + i*each, gg, each);
+        memmove(gg, gg+each, 2*u-each);
+        memset(gg + 2*u-each, 0, each);
     }
     free(ff); ff = 0;
     free(gg); gg = 0;
