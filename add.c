@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-inline void add8(uint8_t *f, const uint8_t *g, uint32_t n) {
+static inline void add8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 0;
     for(uint32_t i=0; i<n; i++) {
         t = (uint16_t)f[i] + (uint16_t)g[i] + t;
@@ -19,7 +19,7 @@ inline void add8(uint8_t *f, const uint8_t *g, uint32_t n) {
     }
 }
 
-inline void add64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
+static inline void add64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
     uint64_t *f = (uint64_t*)ff;
     const uint64_t *g = (uint64_t*)gg;
     const uint32_t  n = nn/8;
@@ -46,7 +46,7 @@ void add(uint8_t *f, const uint8_t *g, uint32_t n) {
         add64(f, g, n);
 }
 
-inline uint8_t addc8(uint8_t *f, const uint8_t *g, uint32_t n) {
+static inline uint8_t addc8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 0;
     for(uint32_t i=0; i<n; i++) {
         t = (uint16_t)f[i] + (uint16_t)g[i] + t;
@@ -56,7 +56,7 @@ inline uint8_t addc8(uint8_t *f, const uint8_t *g, uint32_t n) {
     return t;
 }
 
-inline uint8_t addc64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
+static inline uint8_t addc64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
     uint64_t *f = (uint64_t*)ff;
     const uint64_t *g = (uint64_t*)gg;
     const uint32_t  n = nn/8;
@@ -76,7 +76,7 @@ uint8_t addc(uint8_t *f, const uint8_t *g, uint32_t n) {
         return addc64(f, g, n);
 }
 
-inline void sub8(uint8_t *f, const uint8_t *g, uint32_t n) {
+static inline void sub8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 2;
     for(uint32_t i=0; i<n; i++) {
         t = (uint16_t)f[i] + (uint16_t)(~g[i] & 0xFF) + t;
@@ -96,7 +96,7 @@ void sub(uint8_t *f, const uint8_t *g, uint32_t n) {
     return sub8(f, g, n);
 }
 
-inline uint8_t subc8(uint8_t *f, const uint8_t *g, uint32_t n) {
+static inline uint8_t subc8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 1;
     for(uint32_t i=0; i<n; i++) {
         t = (uint16_t)f[i] + (uint16_t)((~g[i] & 0xFF)) + t;

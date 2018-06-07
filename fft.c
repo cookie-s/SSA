@@ -7,7 +7,7 @@
 #include "common.h"
 #include "add.h"
 
-inline uint32_t bitrev32(uint32_t x)
+static inline uint32_t bitrev32(uint32_t x)
 {
     x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
     x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
@@ -16,7 +16,7 @@ inline uint32_t bitrev32(uint32_t x)
     return((x >> 16) | (x << 16));
 }
 
-inline uint32_t bitrev(uint32_t x, int msbi) {
+static inline uint32_t bitrev(uint32_t x, int msbi) {
     return bitrev32(x) >> (msbi+1);
 }
 
@@ -92,7 +92,7 @@ void shift(uint8_t *f, int m, uint32_t n) {
     }
 }
 
-inline void fft (uint8_t *f, uint32_t u, uint32_t n) {
+extern inline void fft (uint8_t *f, uint32_t u, uint32_t n) {
     assert(u*8 >= n);
     const int msbi = __builtin_clz(n);
     uint8_t *a = (uint8_t*)alloca(u * sizeof(uint8_t));
@@ -126,7 +126,7 @@ inline void fft (uint8_t *f, uint32_t u, uint32_t n) {
     return;
 }
 
-inline void ifft (uint8_t *f, uint32_t u, uint32_t n) {
+extern inline void ifft (uint8_t *f, uint32_t u, uint32_t n) {
     assert(u*8 >= n);
     const int msbi = __builtin_clz(n);
     uint8_t *a = (uint8_t*)alloca(u * sizeof(uint8_t));
@@ -164,7 +164,7 @@ inline void ifft (uint8_t *f, uint32_t u, uint32_t n) {
     return;
 }
 
-inline void naive (uint8_t *f, uint32_t u, uint32_t n) {
+extern inline void naive (uint8_t *f, uint32_t u, uint32_t n) {
     assert(u*8 >= n);
     uint8_t *F = (uint8_t*)alloca(u*n);
     uint8_t *buf = (uint8_t*)alloca(u);
@@ -179,7 +179,7 @@ inline void naive (uint8_t *f, uint32_t u, uint32_t n) {
     memcpy(f, F, u*n);
 }
 
-inline void inaive (uint8_t *f, uint32_t u, uint32_t n) {
+extern inline void inaive (uint8_t *f, uint32_t u, uint32_t n) {
     assert(u*8 >= n);
     uint8_t *F = (uint8_t*)alloca(u * n);
     uint8_t *buf = (uint8_t*)alloca(u);
@@ -212,7 +212,7 @@ void classical(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
         }
     }
 }
-inline void classical64(uint8_t *hh, const uint8_t *ff, const uint8_t *gg, uint32_t nn) {
+extern inline void classical64(uint8_t *hh, const uint8_t *ff, const uint8_t *gg, uint32_t nn) {
     assert(nn % 8 == 0);
     memset(hh, 0, 2*nn * sizeof(uint8_t));
     const uint64_t *f = (const uint64_t*)ff;
@@ -274,25 +274,27 @@ void karatsuba(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
 
 void mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     // len(h) == 2 * len(f) == 2 * len(g) == 2 * n
-    if (n <= 8192) {
+
+    const uint32_t k = 5; // param
+    const uint32_t sp = 1<<k;
+    uint32_t u;
+
+    if (n <= 1<<k) {
         classical64(h, f, g, n);
         return;
     }
 
-    const uint32_t k = 10; // param
-    const uint32_t sp = 1<<k;
-    uint32_t u;
+    // all  8*n bits
+    // each 8*n/sp bits
+    const uint32_t each = n/sp;
+    for(u=2; !(u*8 >= 2*sp && 2*8*each+k+1<8*u); u*=2);
 
-    u = 2*n/sp;
-    u*= 2;
-
-    //printf("k%d u%d sp%d n%d\n", k, u, sp, n);
+    printf("k%d u%d sp%d n%d\n", k, u, sp, n);
     uint8_t *ff = (uint8_t*)malloc(2*u*sp * sizeof(uint8_t));
     uint8_t *gg = (uint8_t*)malloc(2*u*sp * sizeof(uint8_t));
     memset(ff, 0, 2*u*sp * sizeof(uint8_t));
     memset(gg, 0, 2*u*sp * sizeof(uint8_t));
 
-    const uint32_t each = n/sp;
     for(int i=0; i<sp; i++) {
         memcpy(ff + i*u, f + i*each, each);
         memcpy(gg + i*u, g + i*each, each);
@@ -310,6 +312,7 @@ void mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     free(hh); hh = 0;
 
     ifft(ff, u, 2*sp);
+    print_hex(ff, 2*u*sp);
     memset(gg, 0, 2*u);
     memset(gg+2*u, 0, 2*u);
     for(int i=0; i<2*sp; i++) {

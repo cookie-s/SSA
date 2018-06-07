@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "common.h"
+#include "alloca.h"
 #include "fft.c"
 
 const uint8_t a[] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -230,8 +231,10 @@ void test_mult() {
 #define BENCH
 #ifdef BENCH
     {
-        uint8_t f[524288];
-        uint8_t g[524288];
+        //uint8_t f[524288];
+        //uint8_t g[524288];
+        uint8_t f[1<<20];
+        uint8_t g[1<<20];
         for(int i=0; i<sizeof(f); i++) {
             f[i] = rand() & 0xFF;
             g[i] = rand() & 0xFF;
@@ -239,7 +242,9 @@ void test_mult() {
         uint8_t buf2[sizeof(f)*2] = {};
         uint8_t buf3[sizeof(f)*2] = {};
         mult(buf2, f, g, sizeof(f));
+        puts("ssa done");
         karatsuba(buf3, f, g, sizeof(f));
+        puts("karatsuba done");
         if(memcmp(buf2, buf3, 2*sizeof(f))) {
             print_hex(f, sizeof(f)); puts("f");
             print_hex(g, sizeof(f)); puts("g");
@@ -249,6 +254,7 @@ void test_mult() {
             assert(0);
         }
     }
+    return;
 #endif
     {
         for(int k=0; k<100; k++) {
