@@ -10,5 +10,5 @@ test: $(LIBS)
 i: $(LIBS)
 
 clean:
-	rm -f *.o
+	rm -f *.o bench test i
 .PHONY: clean
