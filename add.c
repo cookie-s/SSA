@@ -1,8 +1,23 @@
 #include <stdint.h>
+#include <assert.h>
 
 #include "common.h"
 
-static inline void add8(uint8_t *f, const uint8_t *g, uint32_t n) {
+static inline uint32_t cntbits8(uint8_t *f, uint32_t n) {
+    uint32_t res = 0;
+    for(uint32_t i=0; i<n; i++)
+        res += __builtin_popcount(f[i]);
+    return res;
+}
+static inline uint32_t cntbits64(uint8_t *ff, uint32_t n) {
+    uint64_t *f = (uint64_t*)ff;
+    n /= 8;
+    uint32_t res = 0;
+    for(uint32_t i=0; i<n; i++)
+        res += __builtin_popcountll(f[i]);
+    return res;
+}
+static inline char add8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 0;
     for(uint32_t i=0; i<n; i++) {
         t = (uint16_t)f[i] + (uint16_t)g[i] + t;
@@ -10,6 +25,7 @@ static inline void add8(uint8_t *f, const uint8_t *g, uint32_t n) {
         t >>= 8;
     }
     if(t) {
+        if(cntbits8(f, n) == 0) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = (uint16_t)f[i] + 0xFF + t;
@@ -17,9 +33,10 @@ static inline void add8(uint8_t *f, const uint8_t *g, uint32_t n) {
             t >>= 8;
         }
     }
+    return 1;
 }
 
-static inline void add64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
+static inline char add64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
     uint64_t *f = (uint64_t*)ff;
     const uint64_t *g = (uint64_t*)gg;
     const uint32_t  n = nn/8;
@@ -30,6 +47,7 @@ static inline void add64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
         t >>= 64;
     }
     if(t) {
+        if(cntbits64(ff, nn) == 0) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = (uint128_t)f[i] + 0xFFFFFFFFFFFFFFFFULL + t;
@@ -37,13 +55,14 @@ static inline void add64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
             t >>= 64;
         }
     }
+    return 1;
 }
 
-void add(uint8_t *f, const uint8_t *g, uint32_t n) {
+extern inline char add(uint8_t *f, const uint8_t *g, uint32_t n) {
     if(n % 8)
-        add8(f, g, n);
+        return add8(f, g, n);
     else
-        add64(f, g, n);
+        return add64(f, g, n);
 }
 
 static inline uint8_t addc8(uint8_t *f, const uint8_t *g, uint32_t n) {
@@ -69,14 +88,14 @@ static inline uint8_t addc64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
     return (uint8_t)t;
 }
 
-uint8_t addc(uint8_t *f, const uint8_t *g, uint32_t n) {
+extern inline uint8_t addc(uint8_t *f, const uint8_t *g, uint32_t n) {
     if(n % 8)
         return addc8(f, g, n);
     else
         return addc64(f, g, n);
 }
 
-static inline void sub8(uint8_t *f, const uint8_t *g, uint32_t n) {
+static inline char sub8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 2;
     for(uint32_t i=0; i<n; i++) {
         t = (uint16_t)f[i] + (uint16_t)(~g[i] & 0xFF) + t;
@@ -84,6 +103,7 @@ static inline void sub8(uint8_t *f, const uint8_t *g, uint32_t n) {
         t >>= 8;
     }
     if(t) {
+        if(cntbits8(f, n) == 0) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = (uint16_t)f[i] + 0xFF + t;
@@ -91,8 +111,9 @@ static inline void sub8(uint8_t *f, const uint8_t *g, uint32_t n) {
             t >>= 8;
         }
     }
+    return 1;
 }
-static inline void sub64(uint8_t *ff, const uint8_t *gg, uint32_t n) {
+static inline char sub64(uint8_t *ff, const uint8_t *gg, uint32_t n) {
     uint64_t *f = (uint64_t*)ff;
     const uint64_t *g = (const uint64_t*)gg;
     n /= 8;
@@ -104,6 +125,7 @@ static inline void sub64(uint8_t *ff, const uint8_t *gg, uint32_t n) {
         t >>= 64;
     }
     if(t) {
+        if(cntbits64(ff, n*8) == 0) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = (uint128_t)f[i] + 0xFFFFFFFFFFFFFFFFULL + t;
@@ -111,12 +133,13 @@ static inline void sub64(uint8_t *ff, const uint8_t *gg, uint32_t n) {
             t >>= 64;
         }
     }
+    return 1;
 }
-void sub(uint8_t *f, const uint8_t *g, uint32_t n) {
+extern inline char sub(uint8_t *f, const uint8_t *g, uint32_t n) {
     if(n % 8)
-        sub8(f, g, n);
+        return sub8(f, g, n);
     else
-        sub64(f, g, n);
+        return sub64(f, g, n);
 }
 
 static inline uint8_t subc8(uint8_t *f, const uint8_t *g, uint32_t n) {
@@ -142,7 +165,7 @@ static inline uint8_t subc64(uint8_t *ff, const uint8_t *gg, uint32_t n) {
     return t;
 }
 
-uint8_t subc(uint8_t *f, const uint8_t *g, uint32_t n) {
+extern inline uint8_t subc(uint8_t *f, const uint8_t *g, uint32_t n) {
     if(n % 8)
         return subc8(f, g, n);
     else

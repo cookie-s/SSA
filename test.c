@@ -57,6 +57,12 @@ void test_sub() {
         add(buf1, d, U);
         assert(!memcmp(buf1, c, U));
     }
+    {
+        memcpy(buf1, d, U);
+        sub(buf1, e, U);
+        add(buf1, e, U);
+        assert(!memcmp(buf1, d, U));
+    }
 }
 
 void test_shift() {
@@ -101,6 +107,7 @@ void test_fft() {
         memcpy(buf1, c, U);
         add(buf1, b, U);
         add(buf1, e, U);
+        add(buf1, e, U);
         uint8_t buf2[4*U] = {};
         for(int i=0; i<U; i++)
             buf2[i*4] = buf1[i];
@@ -113,6 +120,7 @@ void test_fft() {
     {
         memcpy(buf1, c, U);
         add(buf1, b, U);
+        add(buf1, e, U);
         add(buf1, e, U);
         uint8_t buf2[32] = {};
         uint8_t buf3[32] = {};
@@ -246,18 +254,23 @@ void test_mult() {
     return;
 #endif
     {
-        for(int k=0; k<100; k++) {
-            printf("%d\n",k);
-            uint8_t f[65536];
-            uint8_t g[65536];
+        for(int k=0,b=0; k<10000; k++) {
+            uint8_t f[32];
+            uint8_t g[32];
             for(int i=0; i<sizeof(f); i++) {
                 f[i] = rand() & 0xFF;
                 g[i] = rand() & 0xFF;
             }
             uint8_t buf2[sizeof(f)*2] = {};
             uint8_t buf3[sizeof(f)*2] = {};
-            mult(buf2, f, g, sizeof(f));
+            if(!mult(buf2, f, g, sizeof(f))) {
+                //puts("fail");
+                k--;
+                b++;
+                continue;
+            }
             karatsuba(buf3, f, g, sizeof(f));
+            printf("%d %d\n",k,b);
             if(memcmp(buf2, buf3, 2*sizeof(f))) {
                 print_hex(f, sizeof(f)); puts("f");
                 print_hex(g, sizeof(f)); puts("g");
