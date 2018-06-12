@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "fft.h"
+#include "mult.h"
 #include "arith.h"
 
 const uint8_t a[] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -68,6 +69,7 @@ void test_sub() {
 
 void test_shift() {
     uint8_t buf1[U];
+    char shift(uint8_t *f, uint32_t m, uint32_t n);
 
     {
         memcpy(buf1, c, U);
@@ -229,31 +231,6 @@ void test_mult() {
         classical(buf3, f, g, sizeof(f));
         assert(!memcmp(buf2, buf3, 2*sizeof(f)));
     }
-#ifdef BENCH
-    {
-        uint8_t f[1<<19];
-        uint8_t g[1<<19];
-        for(int i=0; i<sizeof(f); i++) {
-            f[i] = rand() & 0xFF;
-            g[i] = rand() & 0xFF;
-        }
-        uint8_t buf2[sizeof(f)*2] = {};
-        uint8_t buf3[sizeof(f)*2] = {};
-        mult(buf2, f, g, sizeof(f));
-        puts("ssa done");
-        karatsuba(buf3, f, g, sizeof(f));
-        puts("karatsuba done");
-        if(memcmp(buf2, buf3, 2*sizeof(f))) {
-            print_hex(f, sizeof(f)); puts("f");
-            print_hex(g, sizeof(f)); puts("g");
-            puts("mult result doesn't match");
-            print_hex(buf2, 2*sizeof(f)); puts("ssa");
-            print_hex(buf3, 2*sizeof(f)); puts("karatsuba");
-            assert(0);
-        }
-    }
-    return;
-#endif
     {
         for(int k=0,b=0; k<10000; k++) {
             uint8_t f[32];
@@ -265,7 +242,7 @@ void test_mult() {
             uint8_t buf2[sizeof(f)*2] = {};
             uint8_t buf3[sizeof(f)*2] = {};
             if(!mult(buf2, f, g, sizeof(f))) {
-                //puts("fail");
+                puts("fail");
                 k--;
                 b++;
                 continue;

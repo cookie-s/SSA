@@ -188,7 +188,7 @@ static inline char shift64(uint8_t *ff, int m, uint32_t n) {
     }
     return 1;
 }
-static inline char shift(uint8_t *f, uint32_t m, uint32_t n) {
+extern inline char shift(uint8_t *f, uint32_t m, uint32_t n) {
     if(n % 8 == 0)
         return shift64(f, m, n);
     else

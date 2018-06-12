@@ -1,13 +1,13 @@
 CC := gcc
-CFLAGS := -O3 -lprofiler -Wall
+CFLAGS := -O3 -Wall
 
-LIBS := common.o add.o io.o
+LIBS := common.o arith.o mult.o fft.o io.o
 
-bench: bench.o $(LIBS)
+bench: $(LIBS)
 
-test: test.o $(LIBS)
+test: $(LIBS)
 
-i: i.o $(LIBS)
+i: $(LIBS)
 
 clean:
 	rm -f *.o
