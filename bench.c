@@ -1,7 +1,10 @@
-#include "common.h"
-#include "fft.c"
-
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
+
+#include "common.h"
+#include "mult.h"
 
 int main(void) {
     struct timeval t1, t2;
@@ -12,7 +15,7 @@ int main(void) {
     uint8_t buf2[sizeof(f)*2] = {};
     uint8_t buf3[sizeof(f)*2] = {};
 
-    for(uint32_t bytes = 128; bytes <= 1<<24; bytes<<=1) {
+    for(uint32_t bytes = 128; bytes <= 1<<25; bytes<<=1) {
     //for(uint32_t bytes = 134217728*2/8; bytes <= 1<<25; bytes<<=1) {
         double kpassed = 0, spassed = 0;
         const int N = 1;
@@ -24,7 +27,7 @@ int main(void) {
             gettimeofday(&t1, NULL);
             if(!mult(buf2, f, g, bytes)) {
                 puts("fail");
-                //bytes>>=1;
+                bytes>>=1;
                 continue;
             };
             gettimeofday(&t2, NULL);

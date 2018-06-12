@@ -5,7 +5,7 @@
 #include <assert.h>
 
 #include "common.h"
-#include "add.h"
+#include "arith.h"
 
 static inline uint32_t bitrev32(uint32_t x)
 {
@@ -20,11 +20,6 @@ static inline uint32_t bitrev(uint32_t x, int msbi) {
     return bitrev32(x) >> (msbi+1);
 }
 
-static inline char allzero(uint8_t *f, uint32_t n) {
-    for(uint32_t i=0; i<n; i++)
-        if(f[i]) return 0;
-    return 1;
-}
 static inline uint32_t cntbits8(uint8_t *f, uint32_t n) {
     uint32_t res = 0;
     for(uint32_t i=0; i<n; i++)
@@ -53,26 +48,26 @@ static inline char shift8(uint8_t *f, int m, uint32_t n) {
     {
         uint16_t t = 0;
         for(uint32_t i=0; i<n; i++) {
-            t = (((uint16_t)f[i]) << (m%8)) | t;
-            f[i]  = (uint8_t)t;
+            t |= ((uint16_t)f[i] << (m%8));
+            f[i]  = t;
             t >>= 8;
         }
         if(cnt == 1 && t == 1) return 0;
         if(t) {
             t = (~t + 1) & 0xFF;
-            t = (uint16_t)f[0] + t;
-            f[0] = (uint8_t)t;
+            t = f[0] + t;
+            f[0] = t;
             t >>= 8;
             for(int i=1; i<n; i++) {
-                t = (uint16_t)f[i] + 0xFF + t;
-                f[i] = (uint8_t)t;
+                t = f[i] + 0xFF + t;
+                f[i] = t;
                 t >>= 8;
             }
             if(!t) {
                 t = 1;
                 for(int i=0; i<n; i++) {
-                    t = (uint16_t)f[i] + t;
-                    f[i] = (uint8_t)t;
+                    t = f[i] + t;
+                    f[i] = t;
                     t >>= 8;
                 }
             }
@@ -99,15 +94,15 @@ static inline char shift8(uint8_t *f, int m, uint32_t n) {
         uint16_t t = 1;
         for(uint32_t i=0; i<n; i++) {
             t = ((i-m+2*n)%(2*n) >= n ? (uint8_t)~f[i] : (0xFF+f[i])) + t;
-            f[i] = (uint8_t)t;
+            f[i] = t;
             t >>= 8;
         }
 
         if(!t) {
             t = 1;
             for(uint32_t i=0; i<n; i++) {
-                t = (uint16_t)f[i] + t;
-                f[i] = (uint8_t)t;
+                t = f[i] + t;
+                f[i] = t;
                 t >>= 8;
             }
         }
@@ -133,25 +128,25 @@ static inline char shift64(uint8_t *ff, int m, uint32_t n) {
         uint128_t t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = (((uint128_t)f[i]) << (m%64)) | t;
-            f[i]  = (uint64_t)t;
+            f[i]  = t;
             t >>= 64;
         }
         if(cnt == 1 && t == 1) return 0;
         if(t) {
-            t = (uint64_t)(~t + 1);
-            t = (uint128_t)f[0] + t;
-            f[0] = (uint64_t)t;
+            t = (uint64_t)-t;
+            t = f[0] + t;
+            f[0] = t;
             t >>= 64;
             for(int i=1; i<n; i++) {
                 t = (uint128_t)f[i] + max + t;
-                f[i] = (uint64_t)t;
+                f[i] = t;
                 t >>= 64;
             }
             if(!t) {
                 t = 1;
                 for(int i=0; i<n; i++) {
-                    t = (uint128_t)f[i] + t;
-                    f[i] = (uint64_t)t;
+                    t = f[i] + t;
+                    f[i] = t;
                     t >>= 64;
                 }
             }
@@ -178,15 +173,15 @@ static inline char shift64(uint8_t *ff, int m, uint32_t n) {
         uint128_t t = 1;
         for(uint32_t i=0; i<n; i++) {
             t = ((i-m+2*n)%(2*n) >= n ? (uint64_t)~f[i] : (max+f[i])) + t;
-            f[i] = (uint64_t)t;
+            f[i] = t;
             t >>= 64;
         }
 
         if(!t) {
             t = 1;
             for(uint32_t i=0; i<n; i++) {
-                t = (uint128_t)f[i] + t;
-                f[i] = (uint64_t)t;
+                t = f[i] + t;
+                f[i] = t;
                 t >>= 64;
             }
         }
@@ -203,8 +198,8 @@ static inline char shift(uint8_t *f, uint32_t m, uint32_t n) {
 extern inline char fft (uint8_t *f, uint32_t u, uint32_t n) {
     assert(u*8 >= n);
     const int msbi = __builtin_clz(n);
-    uint8_t *a = (uint8_t*)alloca(u * sizeof(uint8_t));
-    uint8_t *b = (uint8_t*)alloca(u * sizeof(uint8_t));
+    uint8_t *a = (uint8_t*)alloca(u);
+    uint8_t *b = (uint8_t*)alloca(u);
     for(uint32_t i=1,ilog=0; i<n; i<<=1,ilog++) {
         const uint32_t wlog = n>>ilog;
         for(uint32_t j=0; j<n; j+=i<<1) {
@@ -213,12 +208,12 @@ extern inline char fft (uint8_t *f, uint32_t u, uint32_t n) {
                 const uint32_t ai = bitrev(j+k, msbi);
                 const uint32_t bi = bitrev(i+j+k, msbi);
 
-                memcpy(a, f + u*ai, u * sizeof(uint8_t));
-                memcpy(b, f + u*bi, u * sizeof(uint8_t));
+                memcpy(a, f + u*ai, u);
+                memcpy(b, f + u*bi, u);
                 if(!shift(b, wnlog * (u*8/n), u)) return 0;
                 if(!add(f + u*ai, b, u)) return 0;
                 if(!sub(a, b, u)) return 0;
-                memcpy(f + u*bi, a, u * sizeof(uint8_t));
+                memcpy(f + u*bi, a, u);
                 wnlog += wlog;
                 wnlog %= 2*8*u;
             }
@@ -227,9 +222,9 @@ extern inline char fft (uint8_t *f, uint32_t u, uint32_t n) {
     for(uint32_t i=0; i<n; i++) {
         const uint32_t j = bitrev(i,msbi);
         if(j>=i) continue;
-        memcpy(a, f + u*i, u * sizeof(uint8_t));
-        memcpy(f + u*i, f + u*j, u * sizeof(uint8_t));
-        memcpy(f + u*j, a, u * sizeof(uint8_t));
+        memcpy(a, f + u*i, u);
+        memcpy(f + u*i, f + u*j, u);
+        memcpy(f + u*j, a, u);
     }
     return 1;
 }
@@ -237,8 +232,8 @@ extern inline char fft (uint8_t *f, uint32_t u, uint32_t n) {
 extern inline char ifft (uint8_t *f, uint32_t u, uint32_t n) {
     assert(u*8 >= n);
     const int msbi = __builtin_clz(n);
-    uint8_t *a = (uint8_t*)alloca(u * sizeof(uint8_t));
-    uint8_t *b = (uint8_t*)alloca(u * sizeof(uint8_t));
+    uint8_t *a = (uint8_t*)alloca(u);
+    uint8_t *b = (uint8_t*)alloca(u);
     for(uint32_t i=1,ilog=0; i<n; i<<=1,ilog++) {
         const uint32_t wlog = (2*8*u-1) * (n>>ilog);
         for(uint32_t j=0; j<n; j+=i<<1) {
@@ -247,12 +242,12 @@ extern inline char ifft (uint8_t *f, uint32_t u, uint32_t n) {
                 const uint32_t ai = bitrev(j+k, msbi);
                 const uint32_t bi = bitrev(i+j+k, msbi);
 
-                memcpy(a, f + u*ai, u * sizeof(uint8_t));
-                memcpy(b, f + u*bi, u * sizeof(uint8_t));
+                memcpy(a, f + u*ai, u);
+                memcpy(b, f + u*bi, u);
                 if(!shift(b, wnlog * (u*8/n), u)) return 0;
                 if(!add(f + u*ai, b, u)) return 0;
                 if(!sub(a, b, u)) return 0;
-                memcpy(f + u*bi, a, u * sizeof(uint8_t));
+                memcpy(f + u*bi, a, u);
                 wnlog += wlog;
                 wnlog %= 2*8*u;
             }
@@ -261,9 +256,9 @@ extern inline char ifft (uint8_t *f, uint32_t u, uint32_t n) {
     for(uint32_t i=0; i<n; i++) {
         const uint32_t j = bitrev(i,msbi);
         if(j>=i) continue;
-        memcpy(a, f + u*i, u * sizeof(uint8_t));
-        memcpy(f + u*i, f + u*j, u * sizeof(uint8_t));
-        memcpy(f + u*j, a, u * sizeof(uint8_t));
+        memcpy(a, f + u*i, u);
+        memcpy(f + u*i, f + u*j, u);
+        memcpy(f + u*j, a, u);
     }
 
     const uint32_t nlog = __builtin_ctz(n);
@@ -306,192 +301,4 @@ extern inline char inaive (uint8_t *f, uint32_t u, uint32_t n) {
 
     memcpy(f, F, u*n);
     return 1;
-}
-
-void classical(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
-    memset(h, 0, 2*n * sizeof(uint8_t));
-    for(size_t i=0; i<n; i++) {
-        for(size_t j=0; j<n; j++) {
-            uint16_t t = (uint16_t)f[i] * (uint16_t)g[j];
-            for(int k=i+j; k<2*n && t; k++) {
-                if(((uint16_t)h[k] + (t & ((1<<8)-1)))>>8)
-                    t += 1<<8;
-                h[k] += (uint8_t)t;
-                t >>= 8;
-            }
-        }
-    }
-}
-extern inline void classical64(uint8_t *hh, const uint8_t *ff, const uint8_t *gg, uint32_t nn) {
-    assert(nn % 8 == 0);
-    memset(hh, 0, 2*nn * sizeof(uint8_t));
-    const uint64_t *f = (const uint64_t*)ff;
-    const uint64_t *g = (const uint64_t*)gg;
-    const uint64_t  n = nn/8;
-    uint64_t *h = (uint64_t*)hh;
-    for(size_t i=0; i<n; i++) {
-        for(size_t j=0; j<n; j++) {
-            uint128_t t = (uint128_t)f[i] * (uint128_t)g[j];
-            for(int k=i+j; k<2*n && t; k++) {
-                t += (((uint128_t)h[k] + (uint64_t)t)>>64)<<64;
-                h[k] += (uint64_t)t;
-                t >>= 64;
-            }
-        }
-    }
-}
-
-void karatsuba(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
-    assert(n % 2 == 0);
-    memset(h, 0, 2*n);
-    if(n <= 32) {
-        classical64(h, f, g, n);
-        return;
-    }
-    const uint32_t m = n/2;
-    uint8_t *z0 = malloc(n);
-    uint8_t *z1 = malloc(2*n);
-    uint8_t *z2 = malloc(n);
-    uint8_t *b1 = malloc(m);
-    uint8_t *b2 = malloc(m);
-    uint8_t flag = 0;
-    karatsuba(z0, f, g, m);
-    karatsuba(z2, f+m, g+m, m);
-
-    memcpy(b1, f+m, m);
-    flag |= addc(b1, f, m) << 0;
-    memcpy(b2, g+m, m);
-    flag |= addc(b2, g, m) << 1;
-    karatsuba(z1, b1, b2, m);
-    if(flag & 1) h[3*m] += addc(z1+m, b2, m);
-    if(flag & 2) h[3*m] += addc(z1+m, b1, m);
-    if((flag & 0b11) == 0b11) h[3*m]++;
-    if(!subc(z1, z0, n)) assert(h[3*m]), h[3*m]--;
-    if(!subc(z1, z2, n)) assert(h[3*m]), h[3*m]--;
-
-    assert(!addc(h, z0, n));
-    assert(!addc(h + m, z1, n));
-    assert(!addc(h + 2*m, z2, n));
-
-    free(z0); z0 = 0;
-    free(z1); z1 = 0;
-    free(z2); z2 = 0;
-    free(b1); b1 = 0;
-    free(b2); b2 = 0;
-}
-
-static inline uint32_t optk(uint32_t n) {
-    switch(n) {
-        case 1<<7:
-        case 1<<8:
-        case 1<<9:
-        case 1<<10:
-            return 10;
-        case 1<<11:
-            return 11;
-        case 1<<12:
-            return 12;
-        case 1<<13:
-            return 6;
-        case 1<<14:
-            return 6;
-        case 1<<15:
-            return 9;
-        case 1<<16:
-            return 10;
-        case 1<<17:
-            return 10;
-        case 1<<18:
-            return 11;
-        case 1<<19:
-            return 11;
-        case 1<<20:
-            return 12;
-        case 1<<21:
-            return 12;
-        case 1<<22:
-            return 13;
-        case 1<<23:
-            return 13;
-        case 1<<24:
-            return 14;
-        case 1<<25:
-            return 14;
-        default:
-            return 10;
-    }
-}
-char _mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t k);
-char mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
-    return _mult(h,f,g,n,optk(n));
-}
-char _mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t k) {
-    // len(h) == 2 * len(f) == 2 * len(g) == 2 * n
-
-    uint32_t sp, u, each;
-    for(;k<18; k+=2) {
-        sp = 1<<k;
-
-        if (n <= sp) {
-            karatsuba(h, f, g, n);
-            return 1;
-        }
-
-        each = n/sp;
-        for(u=2; !(u*8 >= 2*sp && 2*8*each+k-1<=8*u); u*=2);
-
-
-        uint8_t *ff = (uint8_t*)malloc(2*u*sp * sizeof(uint8_t));
-        uint8_t *gg = (uint8_t*)malloc(2*u*sp * sizeof(uint8_t));
-        memset(ff, 0, 2*u*sp * sizeof(uint8_t));
-        memset(gg, 0, 2*u*sp * sizeof(uint8_t));
-
-        for(int i=0; i<sp; i++) {
-            memcpy(ff + i*u, f + i*each, each);
-            memcpy(gg + i*u, g + i*each, each);
-        }
-        if(!fft(ff, u, 2*sp)) goto KINC;
-        if(!fft(gg, u, 2*sp)) goto KINC;
-
-        uint8_t *hh = (uint8_t*)malloc(2*u * sizeof(uint8_t));
-        uint8_t *hh2 = (uint8_t*)malloc(2*u * sizeof(uint8_t));
-        for(uint32_t i=0; i<2*sp; i++) {
-            assert(u < n);
-            if(!mult(hh, ff + u*i, gg + u*i, u)) goto KINC;
-#if 0
-            karatsuba(hh2, ff + u*i, gg + u*i, u);
-            if(memcmp(hh,hh2,2*u)) {
-                printf("k%d sp%d u%d e%d\n", k, sp, u, each);
-                print_hex(ff + u*i, u); puts("f");
-                print_hex(gg + u*i, u); puts("g");
-                print_hex(hh, 2*u); puts("hh");
-                print_hex(hh2, 2*u); puts("hh2");
-                assert(!memcmp(hh, hh2, 2*u));
-            }
-#endif
-            sub(hh, hh + u, u);
-            memcpy(ff + u*i, hh, u * sizeof(uint8_t));
-        }
-        free(hh); hh = 0;
-        free(hh2); hh2 = 0;
-
-        if(!ifft(ff, u, 2*sp)) goto KINC;
-
-        memset(gg, 0, 2*u);
-        memset(gg+2*u+u, 0, u);
-        for(int i=0; i<2*sp; i++) {
-            memcpy(gg + 2*u, ff + i*u, u);
-            if(!add(gg, gg + 2*u, 2*u)) continue;
-            memcpy(h + i*each, gg, each);
-            memmove(gg, gg+each, 2*u-each);
-            memset(gg + 2*u-each, 0, each);
-        }
-        free(ff); ff = 0;
-        free(gg); gg = 0;
-        return 1;
-
-KINC:
-        ;
-    }
-    return 0;
 }

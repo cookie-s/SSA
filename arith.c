@@ -20,16 +20,16 @@ static inline uint32_t cntbits64(uint8_t *ff, uint32_t n) {
 static inline char add8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 0;
     for(uint32_t i=0; i<n; i++) {
-        t = (uint16_t)f[i] + (uint16_t)g[i] + t;
-        f[i] = (uint8_t)t;
+        t = t + f[i] + g[i];
+        f[i] = t;
         t >>= 8;
     }
     if(t) {
         if(cntbits8(f, n) == 0) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
-            t = (uint16_t)f[i] + 0xFF + t;
-            f[i] = (uint8_t)t;
+            t = t + f[i] + 0xFF;
+            f[i] = t;
             t >>= 8;
         }
     }
@@ -42,16 +42,16 @@ static inline char add64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
     const uint32_t  n = nn/8;
     uint128_t t = 0;
     for(uint32_t i=0; i<n; i++) {
-        t = (uint128_t)f[i] + (uint128_t)g[i] + t;
-        f[i] = (uint64_t)t;
+        t = t + f[i] + g[i];
+        f[i] = t;
         t >>= 64;
     }
     if(t) {
         if(cntbits64(ff, nn) == 0) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
-            t = (uint128_t)f[i] + 0xFFFFFFFFFFFFFFFFULL + t;
-            f[i] = (uint64_t)t;
+            t = t + f[i] + 0xFFFFFFFFFFFFFFFFULL;
+            f[i] = t;
             t >>= 64;
         }
     }
@@ -68,8 +68,8 @@ extern inline char add(uint8_t *f, const uint8_t *g, uint32_t n) {
 static inline uint8_t addc8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 0;
     for(uint32_t i=0; i<n; i++) {
-        t = (uint16_t)f[i] + (uint16_t)g[i] + t;
-        f[i] = (uint8_t)t;
+        t = t + f[i] + g[i];
+        f[i] = t;
         t >>= 8;
     }
     return t;
@@ -81,11 +81,11 @@ static inline uint8_t addc64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
     const uint32_t  n = nn/8;
     uint128_t t = 0;
     for(uint32_t i=0; i<n; i++) {
-        t = (uint128_t)f[i] + (uint128_t)g[i] + t;
-        f[i] = (uint64_t)t;
+        t = t + f[i] + g[i];
+        f[i] = t;
         t >>= 64;
     }
-    return (uint8_t)t;
+    return t;
 }
 
 extern inline uint8_t addc(uint8_t *f, const uint8_t *g, uint32_t n) {
@@ -98,16 +98,16 @@ extern inline uint8_t addc(uint8_t *f, const uint8_t *g, uint32_t n) {
 static inline char sub8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 2;
     for(uint32_t i=0; i<n; i++) {
-        t = (uint16_t)f[i] + (uint16_t)(~g[i] & 0xFF) + t;
-        f[i] = (uint8_t)t;
+        t = t + f[i] + (uint8_t)~g[i];
+        f[i] = t;
         t >>= 8;
     }
     if(t) {
         if(cntbits8(f, n) == 0) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
-            t = (uint16_t)f[i] + 0xFF + t;
-            f[i] = (uint8_t)t;
+            t = t + f[i] + 0xFF;
+            f[i] = t;
             t >>= 8;
         }
     }
@@ -120,16 +120,16 @@ static inline char sub64(uint8_t *ff, const uint8_t *gg, uint32_t n) {
 
     uint128_t t = 2;
     for(uint32_t i=0; i<n; i++) {
-        t = (uint128_t)f[i] + (uint64_t)~g[i] + t;
-        f[i] = (uint64_t)t;
+        t = t + f[i] + (uint64_t)~g[i];
+        f[i] = t;
         t >>= 64;
     }
     if(t) {
         if(cntbits64(ff, n*8) == 0) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
-            t = (uint128_t)f[i] + 0xFFFFFFFFFFFFFFFFULL + t;
-            f[i] = (uint64_t)t;
+            t = t + f[i] + 0xFFFFFFFFFFFFFFFFULL;
+            f[i] = t;
             t >>= 64;
         }
     }
@@ -145,8 +145,8 @@ extern inline char sub(uint8_t *f, const uint8_t *g, uint32_t n) {
 static inline uint8_t subc8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 1;
     for(uint32_t i=0; i<n; i++) {
-        t = (uint16_t)f[i] + (uint8_t)~g[i] + t;
-        f[i] = (uint8_t)t;
+        t = t + f[i] + (uint8_t)~g[i];
+        f[i] = t;
         t >>= 8;
     }
     return t;
@@ -158,8 +158,8 @@ static inline uint8_t subc64(uint8_t *ff, const uint8_t *gg, uint32_t n) {
 
     uint128_t t = 1;
     for(uint32_t i=0; i<n; i++) {
-        t = (uint128_t)f[i] + (uint64_t)~g[i] + t;
-        f[i] = (uint64_t)t;
+        t = t + f[i] + (uint64_t)~g[i];
+        f[i] = t;
         t >>= 64;
     }
     return t;
