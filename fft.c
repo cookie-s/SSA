@@ -54,19 +54,19 @@ static inline char shift8(uint8_t *f, int m, uint32_t n) {
         }
         if(cnt == 1 && t == 1) return 0;
         if(t) {
-            t = (~t + 1) & 0xFF;
+            t = (uint8_t)(~t + 1);
             t = f[0] + t;
             f[0] = t;
             t >>= 8;
             for(int i=1; i<n; i++) {
-                t = f[i] + 0xFF + t;
+                t = t + f[i] + 0xFF;
                 f[i] = t;
                 t >>= 8;
             }
             if(!t) {
                 t = 1;
                 for(int i=0; i<n; i++) {
-                    t = f[i] + t;
+                    t = t + f[i];
                     f[i] = t;
                     t >>= 8;
                 }
@@ -138,7 +138,7 @@ static inline char shift64(uint8_t *ff, int m, uint32_t n) {
             f[0] = t;
             t >>= 64;
             for(int i=1; i<n; i++) {
-                t = (uint128_t)f[i] + max + t;
+                t = t + f[i] + max;
                 f[i] = t;
                 t >>= 64;
             }

@@ -1,9 +1,10 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "common.h"
-#include "alloca.h"
-#include "fft.c"
+#include "fft.h"
+#include "mult.h"
 #include "io.h"
 
 int main(void) {

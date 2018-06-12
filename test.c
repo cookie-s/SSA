@@ -1,9 +1,10 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "common.h"
-#include "alloca.h"
-#include "fft.c"
+#include "fft.h"
+#include "arith.h"
 
 const uint8_t a[] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 const uint8_t b[] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
