@@ -8,7 +8,7 @@
 #include "fft.h"
 #include "mult.h"
 
-void classical(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
+void classical(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     memset(h, 0, 2*n * sizeof(uint8_t));
     for(size_t i=0; i<n; i++) {
         for(size_t j=0; j<n; j++) {
@@ -22,7 +22,7 @@ void classical(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
         }
     }
 }
-extern inline void classical64(uint8_t *hh, const uint8_t *ff, const uint8_t *gg, uint32_t nn) {
+extern inline void classical64(uint8_t * restrict hh, const uint8_t *ff, const uint8_t *gg, uint32_t nn) {
     assert(nn % 8 == 0);
     memset(hh, 0, 2*nn * sizeof(uint8_t));
     const uint64_t *f = (const uint64_t*)ff;
@@ -40,7 +40,7 @@ extern inline void classical64(uint8_t *hh, const uint8_t *ff, const uint8_t *gg
         }
     }
 }
-void karatsuba(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
+void karatsuba(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     assert(n % 2 == 0);
     memset(h, 0, 2*n);
     if(n <= 32) {
@@ -48,35 +48,32 @@ void karatsuba(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
         return;
     }
     const uint32_t m = n/2;
-    uint8_t *z0 = malloc(n);
-    uint8_t *z1 = malloc(2*n);
-    uint8_t *z2 = malloc(n);
-    uint8_t *b1 = malloc(m);
-    uint8_t *b2 = malloc(m);
+    uint8_t *buf = malloc(n + 2*n + n + n);
+    uint8_t *z0 = buf;
+    uint8_t *z1 = buf + n;
+    uint8_t *z2 = buf + n + 2*n;
+    uint8_t *b1 = buf + n + 2*n + n;
+    uint8_t *b2 = buf + n + 2*n + n + m;
     uint8_t flag = 0;
     karatsuba(z0, f, g, m);
     karatsuba(z2, f+m, g+m, m);
 
     memcpy(b1, f+m, m);
-    flag |= addc(b1, f, m) << 0;
     memcpy(b2, g+m, m);
+    flag |= addc(b1, f, m) << 0;
     flag |= addc(b2, g, m) << 1;
     karatsuba(z1, b1, b2, m);
     if(flag & 1) h[3*m] += addc(z1+m, b2, m);
     if(flag & 2) h[3*m] += addc(z1+m, b1, m);
-    if((flag & 0b11) == 0b11) h[3*m]++;
+    h[3*m] += flag == 0b11;
     if(!subc(z1, z0, n)) assert(h[3*m]), h[3*m]--;
     if(!subc(z1, z2, n)) assert(h[3*m]), h[3*m]--;
 
-    assert(!addc(h, z0, n));
-    assert(!addc(h + m, z1, n));
+    memcpy(h, z0, n);
+    h[3*m] += addc(h + m, z1, n);
     assert(!addc(h + 2*m, z2, n));
 
-    free(z0); z0 = 0;
-    free(z1); z1 = 0;
-    free(z2); z2 = 0;
-    free(b1); b1 = 0;
-    free(b2); b2 = 0;
+    free(buf);
 }
 
 static inline uint32_t optk(uint32_t n) {
@@ -115,16 +112,16 @@ static inline uint32_t optk(uint32_t n) {
         case 1<<24:
             return 14;
         case 1<<25:
-            return 14;
+            return 12;
         default:
             return 14;
     }
 }
-char _mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t k);
-char mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n) {
+char _mult(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t k);
+char mult(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     return _mult(h,f,g,n,optk(n));
 }
-char _mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t k) {
+char _mult(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t k) {
     // len(h) == 2 * len(f) == 2 * len(g) == 2 * n
 
     uint32_t sp, u, each;
@@ -140,10 +137,12 @@ char _mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t 
         for(u=2; !(u*8 >= 2*sp && 2*8*each+k-1<=8*u); u*=2);
 
 
-        uint8_t *ff = (uint8_t*)malloc(2*u*sp * sizeof(uint8_t));
-        uint8_t *gg = (uint8_t*)malloc(2*u*sp * sizeof(uint8_t));
-        memset(ff, 0, 2*u*sp * sizeof(uint8_t));
-        memset(gg, 0, 2*u*sp * sizeof(uint8_t));
+        uint8_t *buf = (uint8_t*)malloc(2*u*sp * 2 + 2*u * 2);
+        memset(buf, 0, 2*u*sp * 2);
+        uint8_t *ff = buf;
+        uint8_t *gg = buf + 2*u*sp;
+        uint8_t *hh = buf + 2*u*sp * 2;
+        uint8_t *hh2 = buf + 2*u*sp * 2 + 2*u;
 
         for(int i=0; i<sp; i++) {
             memcpy(ff + i*u, f + i*each, each);
@@ -152,8 +151,6 @@ char _mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t 
         if(!fft(ff, u, 2*sp)) goto KINC;
         if(!fft(gg, u, 2*sp)) goto KINC;
 
-        uint8_t *hh = (uint8_t*)malloc(2*u * sizeof(uint8_t));
-        uint8_t *hh2 = (uint8_t*)malloc(2*u * sizeof(uint8_t));
         for(uint32_t i=0; i<2*sp; i++) {
             assert(u < n);
             if(!mult(hh, ff + u*i, gg + u*i, u)) goto KINC;
@@ -171,9 +168,6 @@ char _mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t 
             sub(hh, hh + u, u);
             memcpy(ff + u*i, hh, u * sizeof(uint8_t));
         }
-        free(hh); hh = 0;
-        free(hh2); hh2 = 0;
-
         if(!ifft(ff, u, 2*sp)) goto KINC;
 
         memset(gg, 0, 2*u);
@@ -185,8 +179,7 @@ char _mult(uint8_t *h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t 
             memmove(gg, gg+each, 2*u-each);
             memset(gg + 2*u-each, 0, each);
         }
-        free(ff); ff = 0;
-        free(gg); gg = 0;
+        free(buf);
         return 1;
 
 KINC:

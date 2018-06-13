@@ -6,16 +6,17 @@
 #include "common.h"
 #include "mult.h"
 
+
 int main(void) {
     struct timeval t1, t2;
     double sec, mic, passed;
 
-    uint8_t f[1<<25];
-    uint8_t g[1<<25];
-    uint8_t buf2[sizeof(f)*2] = {};
-    uint8_t buf3[sizeof(f)*2] = {};
+    uint8_t *f = malloc(1<<27);
+    uint8_t *g = malloc(1<<27);
+    uint8_t buf2[2<<27] = {};
+    uint8_t buf3[2<<27] = {};
 
-    for(uint32_t bytes = 128; bytes <= 1<<25; bytes<<=1) {
+    for(uint32_t bytes = 128; bytes <= 1<<23; bytes<<=1) {
     //for(uint32_t bytes = 134217728*2/8; bytes <= 1<<25; bytes<<=1) {
         double kpassed = 0, spassed = 0;
         const int N = 1;
@@ -33,6 +34,7 @@ int main(void) {
             gettimeofday(&t2, NULL);
             sec = (double)(t2.tv_sec - t1.tv_sec), mic = (double)(t2.tv_usec - t1.tv_usec), passed = sec + mic / 1000.0 / 1000.0;
             spassed += passed;
+            continue;
             gettimeofday(&t1, NULL);
             karatsuba(buf3, f, g, bytes);
             gettimeofday(&t2, NULL);
@@ -48,8 +50,7 @@ int main(void) {
                 assert(0);
             }
         }
-        printf("%8d bits: %.16f %.16f\n", 8*bytes, kpassed/N, spassed/N);
+        printf("%8d : %.16f %.16f\n", 8*bytes, kpassed/N, spassed/N);
     }
-
     return 0;
 }

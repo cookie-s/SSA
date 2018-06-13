@@ -3,19 +3,17 @@
 
 #include "common.h"
 
-static inline uint32_t cntbits8(uint8_t *f, uint32_t n) {
-    uint32_t res = 0;
+static inline char allzero8(uint8_t *f, uint32_t n) {
     for(uint32_t i=0; i<n; i++)
-        res += __builtin_popcount(f[i]);
-    return res;
+        if(f[i]) return 0;
+    return 1;
 }
-static inline uint32_t cntbits64(uint8_t *ff, uint32_t n) {
+static inline char allzero64(uint8_t *ff, uint32_t n) {
     uint64_t *f = (uint64_t*)ff;
     n /= 8;
-    uint32_t res = 0;
     for(uint32_t i=0; i<n; i++)
-        res += __builtin_popcountll(f[i]);
-    return res;
+        if(f[i]) return 0;
+    return 1;
 }
 static inline char add8(uint8_t *f, const uint8_t *g, uint32_t n) {
     uint16_t t = 0;
@@ -25,7 +23,7 @@ static inline char add8(uint8_t *f, const uint8_t *g, uint32_t n) {
         t >>= 8;
     }
     if(t) {
-        if(cntbits8(f, n) == 0) return 0;
+        if(allzero8(f, n)) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = t + f[i] + 0xFF;
@@ -47,7 +45,7 @@ static inline char add64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
         t >>= 64;
     }
     if(t) {
-        if(cntbits64(ff, nn) == 0) return 0;
+        if(allzero64(ff, nn)) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = t + f[i] + 0xFFFFFFFFFFFFFFFFULL;
@@ -103,7 +101,7 @@ static inline char sub8(uint8_t *f, const uint8_t *g, uint32_t n) {
         t >>= 8;
     }
     if(t) {
-        if(cntbits8(f, n) == 0) return 0;
+        if(allzero8(f, n)) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = t + f[i] + 0xFF;
@@ -125,7 +123,7 @@ static inline char sub64(uint8_t *ff, const uint8_t *gg, uint32_t n) {
         t >>= 64;
     }
     if(t) {
-        if(cntbits64(ff, n*8) == 0) return 0;
+        if(allzero64(ff, n*8)) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = t + f[i] + 0xFFFFFFFFFFFFFFFFULL;

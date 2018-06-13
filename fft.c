@@ -79,17 +79,10 @@ static inline char shift8(uint8_t *f, int m, uint32_t n) {
     if(cnt == 1 && m < n && f[n-m] == 1) return 0;
 
     {
-        uint8_t *flag = (uint8_t*)alloca(n);
-        memset(flag, 0, n);
-        for(uint32_t i=0; i<n; i++) {
-            uint8_t s = f[i];
-            for(int j=(i+m)%n; !flag[j]; j+=m,j%=n) {
-                uint8_t t = f[j];
-                f[j] = s;
-                flag[j] = 1;
-                s = t;
-            }
-        }
+        uint8_t *buf = (uint8_t*)alloca(n);
+        memcpy(buf+(m%n), f, n-(m%n));
+        memcpy(buf, f+n-(m%n), (m%n));
+        memcpy(f, buf, n);
 
         uint16_t t = 1;
         for(uint32_t i=0; i<n; i++) {
@@ -158,17 +151,10 @@ static inline char shift64(uint8_t *ff, int m, uint32_t n) {
     if(cnt == 1 && m < n && f[n-m] == 1) return 0;
 
     {
-        uint8_t *flag = (uint8_t*)alloca(n);
-        memset(flag, 0, n);
-        for(uint32_t i=0; i<n; i++) {
-            uint64_t s = f[i];
-            for(int j=(i+m)%n; !flag[j]; j+=m,j%=n) {
-                uint64_t t = f[j];
-                f[j] = s;
-                flag[j] = 1;
-                s = t;
-            }
-        }
+        uint64_t *buf = (uint64_t*)alloca(n * sizeof(uint64_t));
+        memcpy(buf+(m%n), f, sizeof(uint64_t)*(n-(m%n)));
+        memcpy(buf, f+(n-(m%n)), sizeof(uint64_t)*(m%n));
+        memcpy(f, buf, sizeof(uint64_t)*n);
 
         uint128_t t = 1;
         for(uint32_t i=0; i<n; i++) {
@@ -198,8 +184,9 @@ extern inline char shift(uint8_t *f, uint32_t m, uint32_t n) {
 extern inline char fft (uint8_t *f, uint32_t u, uint32_t n) {
     assert(u*8 >= n);
     const int msbi = __builtin_clz(n);
-    uint8_t *a = (uint8_t*)alloca(u);
-    uint8_t *b = (uint8_t*)alloca(u);
+    uint8_t *buf = (uint8_t*)alloca(2*u);
+    uint8_t *a = buf;
+    uint8_t *b = buf + u;
     for(uint32_t i=1,ilog=0; i<n; i<<=1,ilog++) {
         const uint32_t wlog = n>>ilog;
         for(uint32_t j=0; j<n; j+=i<<1) {
@@ -232,8 +219,9 @@ extern inline char fft (uint8_t *f, uint32_t u, uint32_t n) {
 extern inline char ifft (uint8_t *f, uint32_t u, uint32_t n) {
     assert(u*8 >= n);
     const int msbi = __builtin_clz(n);
-    uint8_t *a = (uint8_t*)alloca(u);
-    uint8_t *b = (uint8_t*)alloca(u);
+    uint8_t *buf = (uint8_t*)alloca(2*u);
+    uint8_t *a = buf;
+    uint8_t *b = buf + u;
     for(uint32_t i=1,ilog=0; i<n; i<<=1,ilog++) {
         const uint32_t wlog = (2*8*u-1) * (n>>ilog);
         for(uint32_t j=0; j<n; j+=i<<1) {
