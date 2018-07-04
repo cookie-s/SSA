@@ -117,6 +117,61 @@ static inline uint32_t optk(uint32_t n) {
             return 14;
     }
 }
+char nega(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n) {
+    // len(h) == len(f) == len(g) == n
+
+    uint32_t sp, u, each, k = optk(n);
+    for(;k<18; k+=2) {
+        sp = 1<<k;
+
+        if (n <= sp) {
+            uint8_t *hh = alloca(2*n);
+            karatsuba(hh, f, g, n);
+            sub(hh, hh+n, n);
+            memcpy(h, hh, n);
+            return 1;
+        }
+
+        each = n/sp;
+        for(u=2; !(u*8 >= sp && 2*8*each+k-1<8*u); u*=2);
+
+        uint8_t *buf = (uint8_t*)malloc(u*sp * 2 + u * 5);
+        memset(buf, 0, u*sp * 2);
+        uint8_t *ff = buf;
+        uint8_t *gg = buf + u*sp;
+        uint8_t *hh = buf + u*sp * 2;
+
+        for(int i=0; i<sp; i++) {
+            memcpy(ff + i*u, f + i*each, each);
+            memcpy(gg + i*u, g + i*each, each);
+        }
+        if(!fft(ff, u, sp)) goto KINC;
+        if(!fft(gg, u, sp)) goto KINC;
+
+        for(uint32_t i=0; i<sp; i++) {
+            assert(u < n);
+            if(!nega(hh, ff + u*i, gg + u*i, u)) goto KINC;
+            memcpy(ff + u*i, hh, u * sizeof(uint8_t));
+        }
+        if(!ifft(ff, u, sp)) goto KINC;
+
+        memset(gg, 0, 2*u);
+        memset(gg+2*u+u, 0, u);
+        for(int i=0; i<sp; i++) {
+            memcpy(gg + 2*u, ff + i*u, u);
+            if(!add(gg, gg + 2*u, 2*u)) continue;
+            memcpy(h + i*each, gg, each);
+            memmove(gg, gg+each, 2*u-each);
+            memset(gg + 2*u-each, 0, each);
+        }
+        free(buf);
+        return 1;
+
+KINC:
+        ;
+    }
+    return 0;
+}
 char _mult(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n, uint32_t k);
 char mult(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n) {
     return _mult(h,f,g,n,optk(n));
@@ -134,15 +189,14 @@ char _mult(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n,
         }
 
         each = n/sp;
-        for(u=2; !(u*8 >= 2*sp && 2*8*each+k-1<=8*u); u*=2);
+        for(u=2; !(u*8 >= 2*sp && 2*8*each+k-1<8*u); u*=2);
 
 
-        uint8_t *buf = (uint8_t*)malloc(2*u*sp * 2 + 2*u * 2);
-        memset(buf, 0, 2*u*sp * 2);
+        uint8_t *buf = (uint8_t*)malloc(2*u*sp * 2 + 2*u * 5);
+        memset(buf, 0, 2*u*sp * 2 + 2*u);
         uint8_t *ff = buf;
         uint8_t *gg = buf + 2*u*sp;
         uint8_t *hh = buf + 2*u*sp * 2;
-        uint8_t *hh2 = buf + 2*u*sp * 2 + 2*u;
 
         for(int i=0; i<sp; i++) {
             memcpy(ff + i*u, f + i*each, each);
@@ -153,19 +207,7 @@ char _mult(uint8_t * restrict h, const uint8_t *f, const uint8_t *g, uint32_t n,
 
         for(uint32_t i=0; i<2*sp; i++) {
             assert(u < n);
-            if(!mult(hh, ff + u*i, gg + u*i, u)) goto KINC;
-#if 0
-            karatsuba(hh2, ff + u*i, gg + u*i, u);
-            if(memcmp(hh,hh2,2*u)) {
-                printf("k%d sp%d u%d e%d\n", k, sp, u, each);
-                print_hex(ff + u*i, u); puts("f");
-                print_hex(gg + u*i, u); puts("g");
-                print_hex(hh, 2*u); puts("hh");
-                print_hex(hh2, 2*u); puts("hh2");
-                assert(!memcmp(hh, hh2, 2*u));
-            }
-#endif
-            sub(hh, hh + u, u);
+            if(!nega(hh, ff + u*i, gg + u*i, u)) goto KINC;
             memcpy(ff + u*i, hh, u * sizeof(uint8_t));
         }
         if(!ifft(ff, u, 2*sp)) goto KINC;

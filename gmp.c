@@ -10,8 +10,8 @@ int main(void) {
     mpz_init(a);
     mpz_init(b);
     mpz_init(c);
-    mpz_urandomb(a, state, 67108864);
-    mpz_urandomb(b, state, 67108864);
+    mpz_urandomb(a, state, 134217728);
+    mpz_urandomb(b, state, 134217728);
 
     struct timeval t1, t2;
     double sec, mic, passed;

@@ -23,13 +23,13 @@ static inline char add8(uint8_t *f, const uint8_t *g, uint32_t n) {
         t >>= 8;
     }
     if(t) {
-        if(allzero8(f, n)) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = t + f[i] + 0xFF;
             f[i] = t;
             t >>= 8;
         }
+        if(t == 0) return 0;
     }
     return 1;
 }
@@ -45,13 +45,13 @@ static inline char add64(uint8_t *ff, const uint8_t *gg, uint32_t nn) {
         t >>= 64;
     }
     if(t) {
-        if(allzero64(ff, nn)) return 0;
         t = 0;
         for(uint32_t i=0; i<n; i++) {
             t = t + f[i] + 0xFFFFFFFFFFFFFFFFULL;
             f[i] = t;
             t >>= 64;
         }
+        if(t == 0) return 0;
     }
     return 1;
 }

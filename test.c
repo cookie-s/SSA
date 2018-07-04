@@ -233,8 +233,8 @@ void test_mult() {
     }
     {
         for(int k=0,b=0; k<10000; k++) {
-            uint8_t f[32];
-            uint8_t g[32];
+            uint8_t f[65536];
+            uint8_t g[65536];
             for(int i=0; i<sizeof(f); i++) {
                 f[i] = rand() & 0xFF;
                 g[i] = rand() & 0xFF;

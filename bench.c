@@ -16,7 +16,7 @@ int main(void) {
     uint8_t buf2[2<<27] = {};
     uint8_t buf3[2<<27] = {};
 
-    for(uint32_t bytes = 128; bytes <= 1<<23; bytes<<=1) {
+    for(uint32_t bytes = 128; bytes <= 1<<27; bytes<<=1) {
     //for(uint32_t bytes = 134217728*2/8; bytes <= 1<<25; bytes<<=1) {
         double kpassed = 0, spassed = 0;
         const int N = 1;

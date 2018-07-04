@@ -12,3 +12,13 @@ void print_hex(const uint8_t *f, uint32_t n) {
     return;
 }
 
+void print_hex_rev(const uint8_t *f, uint32_t n) {
+    int i=0;
+    while(!f[n-1-i])i++;
+    printf("%x", f[n-1-i]);
+    i++;
+    for(; i<n; i++)
+        printf("%02x", f[n-1-i]);
+    return;
+}
+
